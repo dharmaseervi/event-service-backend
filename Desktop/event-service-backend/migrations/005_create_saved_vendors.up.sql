@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS saved_vendors (
+  id SERIAL PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  vendor_id INTEGER NOT NULL REFERENCES vendors(id),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
