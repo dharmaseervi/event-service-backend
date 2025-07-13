@@ -11,7 +11,15 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Create the trigger
-CREATE TRIGGER vendor_search_vector_trigger
-BEFORE INSERT OR UPDATE ON vendors
-FOR EACH ROW
-EXECUTE FUNCTION update_vendor_search_vector();
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_trigger
+    WHERE tgname = 'vendor_search_vector_trigger'
+  ) THEN
+    CREATE TRIGGER vendor_search_vector_trigger
+    BEFORE INSERT OR UPDATE ON vendors
+    FOR EACH ROW EXECUTE FUNCTION update_vendor_search_vector();
+  END IF;
+END $$;
