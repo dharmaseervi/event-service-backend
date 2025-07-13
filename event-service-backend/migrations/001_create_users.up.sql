@@ -8,4 +8,12 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_users_email ON users(email);
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes WHERE tablename = 'users' AND indexname = 'idx_users_email'
+    ) THEN
+        CREATE INDEX idx_users_email ON users(email);
+    END IF;
+END
+$$;
