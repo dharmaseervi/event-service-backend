@@ -1,4 +1,4 @@
-CREATE TABLE vendor_ratings (
+CREATE TABLE IF NOT EXISTS vendor_ratings (
   id SERIAL PRIMARY KEY,
   vendor_id INTEGER REFERENCES vendors(id) ON DELETE CASCADE,
   user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
