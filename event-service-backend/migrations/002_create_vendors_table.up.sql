@@ -1,4 +1,4 @@
-CREATE TABLE vendors (
+CREATE TABLE IF NOT EXISTS vendors (
   id SERIAL PRIMARY KEY,                          -- Auto-incrementing primary key
   vendor_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,  
   title TEXT NOT NULL,                            -- Vendor listing title (e.g., "Royal Palace Hall")
