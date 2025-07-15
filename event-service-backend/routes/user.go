@@ -19,6 +19,8 @@ func SetupVendorRoutes(router *gin.Engine) {
 		vendorRoutes.POST("/", controllers.CreateVendor)
 		vendorRoutes.GET("/", controllers.GetAllVendors)
 		vendorRoutes.GET("/:id", controllers.GetVendorByID)
+		vendorRoutes.GET("/featured", controllers.GetFeaturedVendors)
+		vendorRoutes.GET("/recommended", controllers.GetRecommendedVendors)
 	}
 }
 
@@ -35,5 +37,13 @@ func SetupSavedVendorRoutes(router *gin.Engine) {
 		savedVendorRoutes.POST("/", controllers.SaveVendor)
 		savedVendorRoutes.DELETE("/", controllers.UnsaveVendor)
 		savedVendorRoutes.GET("/", controllers.GetSavedVendors)
+	}
+}
+
+func SetupBookingRoutes(r *gin.Engine) {
+	bookings := r.Group("/bookings")
+	{
+		bookings.POST("/", controllers.CreateBooking)
+		bookings.GET("/", controllers.GetBookings)
 	}
 }

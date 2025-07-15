@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -15,12 +16,13 @@ import (
 
 func CreateVendor(c *gin.Context) {
 	var vendor models.VendorListing
+
 	if err := c.ShouldBindJSON(&vendor); err != nil {
 		log.Printf("Error binding JSON: %v", err)
 		utils.RespondWithError(c, http.StatusBadRequest, "Invalid input")
 		return
 	}
-	log.Printf("Vendor data: %+v", vendor.VendorID)
+	log.Printf("Vendor data: %+v", vendor)
 
 	query := `
 		INSERT INTO vendors 
@@ -158,4 +160,93 @@ func DeleteVendor(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Vendor deleted successfully"})
+}
+
+// GET /vendors/featured
+func GetFeaturedVendors(c *gin.Context) {
+	var featured []models.VendorListing
+
+	query := `SELECT id, vendor_id, title, description, category, price_range, location, photos, rating, featured, created_at, updated_at 
+FROM vendors WHERE featured = true ORDER BY updated_at DESC`
+
+	rows, err := config.DB.Query(query)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch featured vendors"})
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var vendor models.VendorListing
+		if err := rows.Scan(
+			&vendor.ID,
+			&vendor.VendorID,
+			&vendor.Title,
+			&vendor.Description,
+			&vendor.Category,
+			&vendor.PriceRange,
+			&vendor.Location,
+			&vendor.Photos,
+			&vendor.Rating,
+			&vendor.Featured,
+			&vendor.CreatedAt,
+			&vendor.UpdatedAt,
+		); err != nil {
+			log.Println("❌ Failed to scan vendor:", err)
+			continue
+		}
+		featured = append(featured, vendor)
+	}
+
+	c.JSON(http.StatusOK, gin.H{"vendors": featured})
+}
+
+func GetRecommendedVendors(c *gin.Context) {
+	location := c.Query("location") // Optional
+	category := c.Query("category") // Optional
+
+	var recommendations []models.VendorListing
+
+	query := `
+		SELECT id, title, category, description, location, price_range, photos, rating, featured
+		FROM vendors
+		WHERE featured = true
+	`
+
+	var args []any
+	argIndex := 1
+
+	if category != "" {
+		query += ` AND category = $` + fmt.Sprint(argIndex)
+		args = append(args, category)
+		argIndex++
+	}
+
+	if location != "" {
+		query += ` AND location ILIKE '%' || $` + fmt.Sprint(argIndex) + ` || '%'`
+		args = append(args, location)
+		argIndex++
+	}
+
+	query += ` ORDER BY rating DESC, updated_at DESC LIMIT 10`
+
+	rows, err := config.DB.Query(query, args...)
+	if err != nil {
+		log.Printf("Failed to fetch recommendations: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch recommendations"})
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var vendor models.VendorListing
+		err := rows.Scan(&vendor.ID, &vendor.Title, &vendor.Category, &vendor.Description, &vendor.Location, &vendor.PriceRange, &vendor.Photos, &vendor.Rating, &vendor.Featured)
+		if err != nil {
+			log.Printf("Scan error: %v", err)
+			continue
+		}
+		recommendations = append(recommendations, vendor)
+	}
+
+	c.JSON(http.StatusOK, gin.H{"vendors": recommendations})
 }

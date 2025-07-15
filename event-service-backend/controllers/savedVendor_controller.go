@@ -69,13 +69,19 @@ func UnsaveVendor(c *gin.Context) {
 // Get all saved vendors for a user
 func GetSavedVendors(c *gin.Context) {
 	userID := c.Query("user_id")
-
 	if userID == "" {
 		utils.RespondWithError(c, http.StatusBadRequest, "Missing user_id")
 		return
 	}
 
-	query := `SELECT id, user_id, vendor_id, created_at FROM saved_vendors WHERE user_id = $1`
+	// Join saved_vendors with vendors to get full vendor details
+	query := `
+		SELECT v.id, v.vendor_id, v.title, v.description, v.category, v.price_range, 
+		       v.location, v.photos, v.rating, v.featured, v.created_at, v.updated_at
+		FROM saved_vendors sv
+		JOIN vendors v ON sv.vendor_id = v.id
+		WHERE sv.user_id = $1
+	`
 	rows, err := config.DB.Query(query, userID)
 	if err != nil {
 		utils.RespondWithError(c, http.StatusInternalServerError, "Failed to fetch saved vendors")
@@ -83,17 +89,29 @@ func GetSavedVendors(c *gin.Context) {
 	}
 	defer rows.Close()
 
-	var saved []models.SavedVendor
+	var vendors []models.VendorListing
 
 	for rows.Next() {
-		var s models.SavedVendor
-		if err := rows.Scan(&s.ID, &s.UserID, &s.VendorID, &s.CreatedAt); err != nil {
-			utils.RespondWithError(c, http.StatusInternalServerError, "Scan error")
-			return
+		var vendor models.VendorListing
+		if err := rows.Scan(
+			&vendor.ID,
+			&vendor.VendorID,
+			&vendor.Title,
+			&vendor.Description,
+			&vendor.Category,
+			&vendor.PriceRange,
+			&vendor.Location,
+			&vendor.Photos,
+			&vendor.Rating,
+			&vendor.Featured,
+			&vendor.CreatedAt,
+			&vendor.UpdatedAt,
+		); err != nil {
+			log.Println("❌ Failed to scan vendor:", err)
+			continue
 		}
-		saved = append(saved, s)
+		vendors = append(vendors, vendor)
 	}
 
-	log.Printf("Found %d saved vendors for user %s", len(saved), userID)
-	c.JSON(http.StatusOK, saved)
+	c.JSON(http.StatusOK, gin.H{"vendors": vendors})
 }

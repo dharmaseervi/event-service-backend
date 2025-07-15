@@ -15,6 +15,8 @@ type VendorListing struct {
 	PriceRange  string         `json:"price_range"`
 	Location    string         `json:"location"`
 	Photos      pq.StringArray `json:"photos" gorm:"type:text[]"`
+	Rating      float64        `json:"rating"`   // e.g., 4.7
+	Featured    bool           `json:"featured"` // featured = true/false
 	CreatedAt   time.Time      `json:"created_at"`
 	UpdatedAt   time.Time      `json:"updated_at"`
 }
