@@ -1,0 +1,6 @@
+CREATE TABLE push_tokens (
+  id SERIAL PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  token TEXT NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
