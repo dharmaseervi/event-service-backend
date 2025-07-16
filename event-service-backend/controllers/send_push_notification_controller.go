@@ -1,13 +1,13 @@
 package controllers
 
 import (
-	"bytes"
-	"encoding/json"
+	"fmt"
 	"log"
-	"net/http"
 
 	"github.com/dharmaseervi/event-service-backend/config"
 	"github.com/gin-gonic/gin"
+
+	expo "github.com/oliveroneill/exponent-server-sdk-golang/sdk"
 )
 
 type ExpoMessage struct {
@@ -24,6 +24,8 @@ func SavePushToken(c *gin.Context) {
 		Token  string `json:"token"`
 	}
 
+	log.Printf("hey: v%", c)
+
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(400, gin.H{"error": "Invalid request"})
 		return
@@ -33,6 +35,7 @@ func SavePushToken(c *gin.Context) {
 	ON CONFLICT (user_id) DO UPDATE SET token = $2, updated_at = CURRENT_TIMESTAMP`, req.UserID, req.Token)
 
 	if err != nil {
+		log.Printf("hey: %v", err)
 		c.JSON(500, gin.H{"error": "Failed to store token"})
 		return
 	}
@@ -40,35 +43,38 @@ func SavePushToken(c *gin.Context) {
 	c.JSON(200, gin.H{"message": "Token stored"})
 }
 
-func SendPushNotification(pushToken, title, body string, data map[string]interface{}) error {
-	message := ExpoMessage{
-		To:    pushToken,
-		Title: title,
-		Body:  body,
-		Sound: "default",
-		Data:  data,
-	}
+func SendPushNotification(c *gin.Context) {
 
-	jsonData, err := json.Marshal(message)
+	pushToken, err := expo.NewExponentPushToken("ExponentPushToken[81NJ4oBLW2SpwlmCXMFCby]")
 	if err != nil {
-		return err
+		panic(err)
 	}
 
-	req, err := http.NewRequest("POST", "https://exp.host/--/api/v2/push/send", bytes.NewBuffer(jsonData))
+	// Create a new Expo SDK client
+	client := expo.NewPushClient(nil)
+
+	// Publish message
+	response, err := client.Publish(
+		&expo.PushMessage{
+			To:       []expo.ExponentPushToken{pushToken},
+			Body:     "This is a test notification from expo go",
+			Data:     map[string]string{"withSome": "data"},
+			Sound:    "default",
+			Title:    "Notification Title",
+			Priority: expo.DefaultPriority,
+		},
+	)
+
+	// Check errors
 	if err != nil {
-		return err
+		panic(err)
 	}
 
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
+	// Validate responses
+	if response.ValidateResponse() != nil {
+		fmt.Println(response.PushMessage.To, "failed")
 	}
-	defer resp.Body.Close()
 
-	log.Printf("Expo push response status: %s", resp.Status)
-	return nil
+	fmt.Println([]byte(pushToken))
+
 }

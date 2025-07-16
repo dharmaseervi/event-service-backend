@@ -51,27 +51,7 @@ func SetupBookingRoutes(r *gin.Engine) {
 func SeTupSendNotification(r *gin.Engine) {
 	notification := r.Group("/notif")
 	{
-		notification.POST("/", sendPushNotificationHandler)
-		notification.POST("/push-token", sendPushNotificationHandler)
+		notification.POST("/", controllers.SendPushNotification)
+		notification.POST("/push-token", controllers.SavePushToken)
 	}
-}
-
-// sendPushNotificationHandler wraps controllers.SendPushNotification to match gin.HandlerFunc
-func sendPushNotificationHandler(c *gin.Context) {
-	var req struct {
-		PushToken string                 `json:"pushToken"`
-		Title     string                 `json:"title"`
-		Body      string                 `json:"body"`
-		Data      map[string]interface{} `json:"data"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(400, gin.H{"error": "Invalid request"})
-		return
-	}
-	err := controllers.SendPushNotification(req.PushToken, req.Title, req.Body, req.Data)
-	if err != nil {
-		c.JSON(500, gin.H{"error": err.Error()})
-		return
-	}
-	c.JSON(200, gin.H{"message": "Notification sent successfully"})
 }
