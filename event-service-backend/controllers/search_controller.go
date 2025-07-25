@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -13,9 +14,12 @@ import (
 )
 
 func SearchVendors(c *gin.Context) {
-	// Get and validate search query
 	searchQuery := strings.TrimSpace(c.Query("q"))
-	log.Printf("Search query: %s", searchQuery)
+	location := strings.TrimSpace(c.Query("location"))
+	category := strings.TrimSpace(c.Query("category"))
+	fromDate := strings.TrimSpace(c.Query("from_date"))
+	toDate := strings.TrimSpace(c.Query("to_date"))
+
 	if searchQuery == "" {
 		utils.RespondWithError(c, http.StatusBadRequest, "Search query is required")
 		return
@@ -23,7 +27,6 @@ func SearchVendors(c *gin.Context) {
 
 	vendors := []models.VendorListing{}
 
-	// Full-text search query with ranking and sanitization
 	query := `
 	SELECT 
 		id, vendor_id, title, description, category, 
@@ -31,11 +34,38 @@ func SearchVendors(c *gin.Context) {
 		ts_rank(search_vector, websearch_to_tsquery('english', $1)) as rank
 	FROM vendors
 	WHERE search_vector @@ websearch_to_tsquery('english', $1)
-	ORDER BY rank DESC, created_at DESC
-	LIMIT 50
-`
+	`
+	args := []interface{ any }{searchQuery}
+	argPos := 2
 
-	rows, err := config.DB.Query(query, searchQuery)
+	if location != "" {
+		query += fmt.Sprintf(" AND location ILIKE $%d", argPos)
+		args = append(args, "%"+location+"%")
+		argPos++
+	}
+
+	if category != "" {
+		query += fmt.Sprintf(" AND category ILIKE $%d", argPos)
+		args = append(args, "%"+category+"%")
+		argPos++
+	}
+
+	if fromDate != "" && toDate != "" {
+		query += fmt.Sprintf(`
+			AND NOT EXISTS (
+				SELECT 1 FROM vendor_bookings vb
+				WHERE vb.vendor_id = vendors.id
+				AND vb.booked_from <= $%d
+				AND vb.booked_to >= $%d
+			)
+		`, argPos, argPos+1)
+		args = append(args, toDate, fromDate)
+		argPos += 2
+	}
+
+	query += " ORDER BY rank DESC, created_at DESC LIMIT 50"
+
+	rows, err := config.DB.Query(query, args...)
 	if err != nil {
 		log.Printf("Error searching vendors: %v", err)
 		utils.RespondWithError(c, http.StatusInternalServerError, "Could not perform search")
@@ -46,7 +76,7 @@ func SearchVendors(c *gin.Context) {
 	for rows.Next() {
 		var vendor models.VendorListing
 		var photos pq.StringArray
-		var location string
+		var loc string
 		var rank float64
 
 		err := rows.Scan(
@@ -56,30 +86,21 @@ func SearchVendors(c *gin.Context) {
 			&vendor.Description,
 			&vendor.Category,
 			&vendor.PriceRange,
-			&location, // first location (string)
-			&photos,   // then photos (pq.StringArray)
+			&loc,
+			&photos,
 			&vendor.CreatedAt,
 			&vendor.UpdatedAt,
 			&rank,
 		)
-
-		vendor.Location = location
-		vendor.Photos = []string(photos)
-
 		if err != nil {
-			log.Printf("Error scanning search result: %v", err)
-			utils.RespondWithError(c, http.StatusInternalServerError, "Could not process results")
+			log.Printf("Error scanning result: %v", err)
+			utils.RespondWithError(c, http.StatusInternalServerError, "Failed to read results")
 			return
 		}
+		vendor.Location = loc
+		vendor.Photos = []string(photos)
 		vendors = append(vendors, vendor)
 	}
 
-	if err = rows.Err(); err != nil {
-		log.Printf("Error after scanning rows: %v", err)
-		utils.RespondWithError(c, http.StatusInternalServerError, "Error processing results")
-		return
-	}
-
-	// Return results with search metadata
 	utils.RespondWithJSON(c, http.StatusOK, vendors)
 }

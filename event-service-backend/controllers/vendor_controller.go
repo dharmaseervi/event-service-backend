@@ -111,6 +111,8 @@ func GetAllVendors(c *gin.Context) {
 
 func GetVendorByID(c *gin.Context) {
 	id := c.Param("id") // Get ID from URL
+	category := c.Param("category")
+
 	log.Printf("Fetching vendor with ID: %s", id)
 	var vendor models.VendorListing
 
@@ -118,6 +120,10 @@ func GetVendorByID(c *gin.Context) {
 		SELECT id, vendor_id, title, description, category, price_range, location, photos, created_at, updated_at
 		FROM vendors WHERE id = $1
 	`
+	if category != "" {
+		query += ` AND category = $2`
+	}
+
 	err := config.DB.QueryRow(query, id).Scan(
 		&vendor.ID,
 		&vendor.VendorID,

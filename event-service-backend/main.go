@@ -36,6 +36,8 @@ func main() {
 	routes.SetupSavedVendorRoutes(router)
 	routes.SetupBookingRoutes(router)
 	routes.SeTupSendNotification(router)
+	routes.SetupUnavailableDateRoutes(router)
+	routes.SetupVendorDealsRoutes(router)
 
 	// Health check endpoint
 	router.GET("/health", func(c *gin.Context) {

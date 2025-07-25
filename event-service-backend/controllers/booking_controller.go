@@ -13,14 +13,13 @@ import (
 // POST /bookings
 func CreateBooking(c *gin.Context) {
 	var booking models.Booking
-	log.Printf("Received request to booking: %v", c.Request.Body)
 
 	if err := c.ShouldBindJSON(&booking); err != nil {
 		log.Printf("BindJSON error: %v", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	log.Printf("booking vendorId: %d", booking.VendorID)
+
 	if booking.UserID == 0 || booking.VendorID == 0 || booking.EventDate.IsZero() {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "user_id, vendor_id, and event_date are required"})
 		return

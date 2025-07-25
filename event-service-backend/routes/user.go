@@ -55,3 +55,19 @@ func SeTupSendNotification(r *gin.Engine) {
 		notification.POST("/push-token", controllers.SavePushToken)
 	}
 }
+
+func SetupUnavailableDateRoutes(router *gin.Engine) {
+	unavailableDateRoutes := router.Group("/unavailable-dates")
+	{
+		unavailableDateRoutes.POST("/:vendor_id", controllers.CreateUnavailableDate)
+		unavailableDateRoutes.GET("/", controllers.GetVendorUnavailability)
+	}
+}
+
+func SetupVendorDealsRoutes(router *gin.Engine) {
+	vendorDealsRoutes := router.Group("/vendor-deals")
+	{
+		vendorDealsRoutes.POST("/:vendor_id", controllers.CreateVendorDeals)
+		vendorDealsRoutes.GET("/", controllers.GetAllVendorsDeals)
+	}
+}
