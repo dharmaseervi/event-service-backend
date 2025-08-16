@@ -31,15 +31,14 @@ func CreateUser(c *gin.Context) {
 
 	query := `
 		INSERT INTO users 
-			(first_name, last_name, email, password_hash, role, created_at, updated_at) 
-		VALUES ($1, $2, $3, $4, $5, $6, $7) 
+			(full_name, email, password, role, created_at, updated_at) 
+		VALUES ($1, $2, $3, $4, $5, $6) 
 		RETURNING id, created_at, updated_at
 	`
 
 	err := config.DB.QueryRow(
 		query,
-		user.FirstName,
-		user.LastName,
+		user.FullName,
 		user.Email,
 		user.PasswordHash,
 		user.Role,
@@ -63,7 +62,7 @@ func CreateUser(c *gin.Context) {
 
 func GetAllUsers(c *gin.Context) {
 	rows, err := config.DB.Query(`
-		SELECT id, first_name, last_name, email, role, created_at, updated_at 
+		SELECT id, full_name, email, role, created_at, updated_at 
 		FROM users
 		ORDER BY created_at DESC
 	`)
@@ -80,8 +79,7 @@ func GetAllUsers(c *gin.Context) {
 		var user models.User
 		err := rows.Scan(
 			&user.ID,
-			&user.FirstName,
-			&user.LastName,
+			&user.FullName,
 			&user.Email,
 			&user.Role,
 			&user.CreatedAt,

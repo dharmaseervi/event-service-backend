@@ -11,11 +11,11 @@ import (
 )
 
 type ExpoMessage struct {
-	To    string                 `json:"to"`
-	Title string                 `json:"title"`
-	Body  string                 `json:"body"`
-	Sound string                 `json:"sound,omitempty"`
-	Data  map[string]interface{} `json:"data,omitempty"`
+	To    string            `json:"to"`
+	Title string            `json:"title"`
+	Body  string            `json:"body"`
+	Sound string            `json:"sound,omitempty"`
+	Data  map[string]string `json:"data"`
 }
 
 func SavePushToken(c *gin.Context) {
@@ -44,7 +44,12 @@ func SavePushToken(c *gin.Context) {
 }
 
 func SendPushNotification(c *gin.Context) {
+	var req ExpoMessage
 
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "Invalid request"})
+		return
+	}
 	pushToken, err := expo.NewExponentPushToken("ExponentPushToken[81NJ4oBLW2SpwlmCXMFCby]")
 	if err != nil {
 		panic(err)
@@ -57,10 +62,10 @@ func SendPushNotification(c *gin.Context) {
 	response, err := client.Publish(
 		&expo.PushMessage{
 			To:       []expo.ExponentPushToken{pushToken},
-			Body:     "This is a test notification from expo go",
-			Data:     map[string]string{"withSome": "data"},
+			Body:     req.Body,
+			Data:     req.Data,
 			Sound:    "default",
-			Title:    "Notification Title",
+			Title:    req.Title,
 			Priority: expo.DefaultPriority,
 		},
 	)

@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS vendors (
   location TEXT,                                  -- City or area
   photos TEXT[],                                  -- Array of photo URLs (PostgreSQL supports arrays)
   rating NUMERIC(2,1) DEFAULT 0,            -- Rating out of 5, default is 0
-  featured BOOLEAN DEFAULT FALSE
+  featured BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP, -- Auto-timestamp
   updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP  -- Auto-timestamp
 );
