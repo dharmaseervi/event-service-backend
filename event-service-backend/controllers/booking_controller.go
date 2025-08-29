@@ -1,10 +1,12 @@
 package controllers
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"time"
 
+	"github.com/clerk/clerk-sdk-go/v2"
 	"github.com/dharmaseervi/event-service-backend/config"
 	"github.com/dharmaseervi/event-service-backend/models"
 	"github.com/gin-gonic/gin"
@@ -19,6 +21,25 @@ func CreateBooking(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
+	// Clerk middleware verified the JWT and put the session claims in the request context
+	claims, ok := clerk.SessionClaimsFromContext(c.Request.Context())
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	clerkID := claims.Subject // <- This is the Clerk user ID (e.g. "user_abc123")
+
+	fmt.Println("Clerk ID:", clerkID)
+
+	// Map Clerk ID -> local DB user id
+	var localUserID int
+	if err := config.DB.QueryRow(`SELECT id FROM users WHERE clerk_id=$1`, clerkID).Scan(&localUserID); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found"})
+		return
+	}
+
+	booking.UserID = localUserID
 
 	if booking.UserID == 0 || booking.VendorID == 0 || booking.EventDate.IsZero() {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "user_id, vendor_id, and event_date are required"})
@@ -47,6 +68,8 @@ func CreateBooking(c *gin.Context) {
 		booking.UpdatedAt,
 	).Scan(&booking.ID)
 
+	log.Printf("❌ Insert failed: %v", err)
+
 	if err != nil {
 		log.Printf("❌ Insert failed: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create booking"})
@@ -59,68 +82,66 @@ func CreateBooking(c *gin.Context) {
 	})
 }
 
-func GetBookings(c *gin.Context) {
+func GetMyBookings(c *gin.Context) {
 	type BookingWithVendor struct {
 		models.Booking
 		Vendor models.VendorListing `json:"vendor"`
 	}
 
-	var bookings []BookingWithVendor
+	claims, ok := clerk.SessionClaimsFromContext(c.Request.Context())
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	clerkID := claims.Subject
 
-	query := `
-		SELECT 
-			b.id, b.user_id, b.vendor_id, b.event_date, b.status, b.notes, b.created_at, b.updated_at,
-			v.id, v.vendor_id, v.title, v.description, v.category, v.price_range, v.location, v.photos, v.created_at, v.updated_at
+	var localUserID int
+	if err := config.DB.QueryRow(`SELECT id FROM users WHERE clerk_id=$1`, clerkID).Scan(&localUserID); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "user not found"})
+		return
+	}
+
+	const q = `
+		SELECT
+		  b.id, b.user_id, b.vendor_id, b.event_date, b.status, b.notes, b.created_at, b.updated_at,
+		  v.id, v.vendor_id, v.title, v.description, v.category, v.price_range, v.location,
+		  COALESCE(v.photos, ARRAY[]::text[]) AS photos,
+		  v.created_at, v.updated_at
 		FROM bookings b
-		JOIN vendors v ON b.vendor_id = v.id
+		LEFT JOIN vendors v ON v.id = b.vendor_id
+		WHERE b.user_id = $1
 		ORDER BY b.created_at DESC
 	`
-
-	rows, err := config.DB.Query(query)
+	rows, err := config.DB.Query(q, localUserID)
 	if err != nil {
-		log.Println("Query error:", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch bookings"})
+		log.Printf("GetMyBookings query error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch bookings"})
 		return
 	}
 	defer rows.Close()
 
+	var out []BookingWithVendor
+	count := 0
 	for rows.Next() {
 		var b BookingWithVendor
-
-		err := rows.Scan(
-			// booking fields
-			&b.ID,
-			&b.UserID,
-			&b.VendorID,
-			&b.EventDate,
-			&b.Status,
-			&b.Notes,
-			&b.CreatedAt,
-			&b.UpdatedAt,
-			// vendor fields
-			&b.Vendor.ID,
-			&b.Vendor.VendorID,
-			&b.Vendor.Title,
-			&b.Vendor.Description,
-			&b.Vendor.Category,
-			&b.Vendor.PriceRange,
-			&b.Vendor.Location,
-			&b.Vendor.Photos,
-			&b.Vendor.CreatedAt,
-			&b.Vendor.UpdatedAt,
-		)
-
-		if err != nil {
-			log.Println("Row scan error:", err)
+		if err := rows.Scan(
+			&b.ID, &b.UserID, &b.VendorID, &b.EventDate, &b.Status, &b.Notes, &b.CreatedAt, &b.UpdatedAt,
+			&b.Vendor.ID, &b.Vendor.VendorID, &b.Vendor.Title, &b.Vendor.Description, &b.Vendor.Category,
+			&b.Vendor.PriceRange, &b.Vendor.Location, &b.Vendor.Photos,
+			&b.Vendor.CreatedAt, &b.Vendor.UpdatedAt,
+		); err != nil {
+			log.Printf("GetMyBookings scan error: %v", err) // ← SEE THIS IN LOGS
 			continue
 		}
-
-		bookings = append(bookings, b)
+		out = append(out, b)
+		count++
+	}
+	if err := rows.Err(); err != nil {
+		log.Printf("GetMyBookings rows iteration error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "iteration failed"})
+		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success":  true,
-		"bookings": bookings,
-	})
-
+	log.Printf("GetMyBookings: user %d → %d rows", localUserID, count)
+	c.JSON(http.StatusOK, gin.H{"success": true, "bookings": out})
 }

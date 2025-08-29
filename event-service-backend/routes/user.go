@@ -2,6 +2,7 @@ package routes
 
 import (
 	"github.com/dharmaseervi/event-service-backend/controllers"
+	"github.com/dharmaseervi/event-service-backend/middleware"
 	"github.com/gin-gonic/gin"
 )
 
@@ -31,20 +32,20 @@ func SetupSearchRoutes(router *gin.Engine) {
 	}
 }
 
-func SetupSavedVendorRoutes(router *gin.Engine) {
-	savedVendorRoutes := router.Group("/saved-vendors")
+func SetupSavedVendorRoutes(r *gin.Engine) {
+	g := r.Group("/saved-vendors", middleware.ClerkAuthMiddleware())
 	{
-		savedVendorRoutes.POST("/", controllers.SaveVendor)
-		savedVendorRoutes.DELETE("/", controllers.UnsaveVendor)
-		savedVendorRoutes.GET("/", controllers.GetSavedVendors)
+		g.GET("/me", controllers.GetMySavedVendors)
+		g.POST("/", controllers.SaveVendor)
+		g.DELETE("/:vendor_id", controllers.UnsaveVendor)
 	}
 }
 
 func SetupBookingRoutes(r *gin.Engine) {
-	bookings := r.Group("/bookings")
+	bookings := r.Group("/bookings", middleware.ClerkAuthMiddleware())
 	{
 		bookings.POST("/", controllers.CreateBooking)
-		bookings.GET("/", controllers.GetBookings)
+		bookings.GET("/", controllers.GetMyBookings)
 	}
 }
 
@@ -57,7 +58,7 @@ func SeTupSendNotification(r *gin.Engine) {
 }
 
 func SetupUnavailableDateRoutes(router *gin.Engine) {
-	unavailableDateRoutes := router.Group("/unavailable-dates")
+	unavailableDateRoutes := router.Group("/unavailable-dates", middleware.ClerkAuthMiddleware())
 	{
 		unavailableDateRoutes.POST("/:vendor_id", controllers.CreateUnavailableDate)
 		unavailableDateRoutes.GET("/", controllers.GetVendorUnavailability)

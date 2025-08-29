@@ -7,8 +7,8 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/clerk/clerk-sdk-go/v2"
 	"github.com/dharmaseervi/event-service-backend/config"
-	"github.com/dharmaseervi/event-service-backend/migrations"
 	"github.com/dharmaseervi/event-service-backend/routes"
 	"github.com/gin-gonic/gin"
 )
@@ -17,10 +17,9 @@ func main() {
 	// Initialize database
 	config.InitDB()
 	defer config.CloseDB()
-	// Run migrations
-	if err := migrations.RunMigrations(config.DB); err != nil {
-		log.Fatalf("Failed to run migrations: %v", err)
-	}
+
+	clerk.SetKey(os.Getenv("CLERK_SECRET_KEY"))
+
 	// Set Gin mode
 	if os.Getenv("GIN_MODE") == "release" {
 		gin.SetMode(gin.ReleaseMode)

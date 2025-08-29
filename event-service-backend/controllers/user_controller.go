@@ -14,7 +14,7 @@ import (
 func CreateUser(c *gin.Context) {
 	var user models.User
 
-	log.Println("Creating user...", user)
+	log.Println("Creating user...")
 
 	// Bind JSON payload to user struct
 	if err := c.ShouldBindJSON(&user); err != nil {
@@ -23,30 +23,24 @@ func CreateUser(c *gin.Context) {
 	}
 
 	log.Printf("User data: %+v", user)
-	// Hash the password before storing
-	if err := user.HashPassword(); err != nil {
-		utils.RespondWithError(c, http.StatusInternalServerError, "Could not process password")
-		return
-	}
 
+	// Insert user (no password now)
 	query := `
 		INSERT INTO users 
-			(full_name, email, password, role, created_at, updated_at) 
+			(clerk_id, full_name, email, role, created_at, updated_at) 
 		VALUES ($1, $2, $3, $4, $5, $6) 
 		RETURNING id, created_at, updated_at
 	`
 
 	err := config.DB.QueryRow(
 		query,
+		user.ClerkID,
 		user.FullName,
 		user.Email,
-		user.PasswordHash,
 		user.Role,
 		time.Now(),
 		time.Now(),
 	).Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt)
-
-	log.Printf("User created with ID: %d", user.ID)
 
 	if err != nil {
 		log.Printf("Error creating user: %v", err)
@@ -54,15 +48,13 @@ func CreateUser(c *gin.Context) {
 		return
 	}
 
-	// Clear password fields before returning
-	user.Password = ""
-	user.PasswordHash = ""
+	log.Printf("User created with ID: %d", user.ID)
 	utils.RespondWithJSON(c, http.StatusCreated, user)
 }
 
 func GetAllUsers(c *gin.Context) {
 	rows, err := config.DB.Query(`
-		SELECT id, full_name, email, role, created_at, updated_at 
+		SELECT id, clerk_id, full_name, email, role, created_at, updated_at 
 		FROM users
 		ORDER BY created_at DESC
 	`)
@@ -79,6 +71,7 @@ func GetAllUsers(c *gin.Context) {
 		var user models.User
 		err := rows.Scan(
 			&user.ID,
+			&user.ClerkID,
 			&user.FullName,
 			&user.Email,
 			&user.Role,

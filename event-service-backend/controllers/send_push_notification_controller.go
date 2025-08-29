@@ -24,8 +24,6 @@ func SavePushToken(c *gin.Context) {
 		Token  string `json:"token"`
 	}
 
-	log.Printf("hey: v%", c)
-
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(400, gin.H{"error": "Invalid request"})
 		return
