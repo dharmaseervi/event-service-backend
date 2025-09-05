@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 
@@ -20,24 +21,28 @@ type ExpoMessage struct {
 }
 
 func SavePushToken(c *gin.Context) {
+
 	var req struct {
 		Token string `json:"token"`
 	}
 
-	// Bind only the token from client
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil || req.Token == "" {
 		c.JSON(400, gin.H{"error": "Invalid request"})
 		return
 	}
 
 	claims, ok := clerk.SessionClaimsFromContext(c.Request.Context())
+
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
 	clerkID := claims.Subject
 
+	fmt.Println("Clerk ID:", clerkID)
+
 	if clerkID == "" {
+		fmt.Println("Clerk ID:", clerkID)
 		c.JSON(401, gin.H{"error": "unauthorized"})
 		return
 	}
