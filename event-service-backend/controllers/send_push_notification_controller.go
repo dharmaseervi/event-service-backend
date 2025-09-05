@@ -2,7 +2,9 @@ package controllers
 
 import (
 	"log"
+	"net/http"
 
+	"github.com/clerk/clerk-sdk-go/v2"
 	"github.com/dharmaseervi/event-service-backend/config"
 	"github.com/gin-gonic/gin"
 
@@ -28,8 +30,13 @@ func SavePushToken(c *gin.Context) {
 		return
 	}
 
-	// 🔑 Clerk ID from middleware
-	clerkID := c.GetString("clerk_id")
+	claims, ok := clerk.SessionClaimsFromContext(c.Request.Context())
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	clerkID := claims.Subject
+
 	if clerkID == "" {
 		c.JSON(401, gin.H{"error": "unauthorized"})
 		return
