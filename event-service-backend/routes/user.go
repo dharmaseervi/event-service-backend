@@ -50,7 +50,7 @@ func SetupBookingRoutes(r *gin.Engine) {
 }
 
 func SeTupSendNotification(r *gin.Engine) {
-	notification := r.Group("/notif")
+	notification := r.Group("/notif", middleware.ClerkAuthMiddleware())
 	{
 		notification.POST("/", controllers.SendPushNotification)
 		notification.POST("/push-token", controllers.SavePushToken)
